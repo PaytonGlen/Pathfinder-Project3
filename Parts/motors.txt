@@ -1,0 +1,23 @@
+Motors
+======
+
+The drive system is the TB6612FNG motor driver shield plus the two DC gear motors.
+
+Motor driver pins on the master:
+- D3 = STBY
+- D5 = PWMA
+- D6 = PWMB
+- D7 = AIN1
+- D8 = BIN1
+
+Drive tuning values we used:
+- `LEFT_DRIVE_SPEED = 173`
+- `RIGHT_DRIVE_SPEED = 180`
+- `TURN_SPEED = 220`
+
+How turning works:
+- tank steering is differential drive
+- if the tracks move at different speeds, the tank turns
+- if they spin opposite directions, the tank pivots in place
+
+Since we do not have encoders, distance and turns are based on time.

@@ -1,0 +1,22 @@
+Servos
+======
+
+The scan arm uses two small servos on the master Arduino.
+
+Servo jobs:
+- pan servo moves left and right
+- tilt servo moves up and down
+
+Pins on the master:
+- D10 = pan servo
+- D11 = tilt servo
+
+Angles we calibrated:
+- `PAN_CENTER = 50`
+- `PAN_LEFT = 110`
+- `PAN_RIGHT = 0`
+- `TILT_LEVEL = 160`
+
+Why the arm matters:
+- the tank can stop with the front sensor alone
+- the arm is what lets it check both sides and choose where to turn

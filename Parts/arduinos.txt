@@ -1,0 +1,22 @@
+Arduinos
+========
+
+We use two Arduino Uno R3 boards.
+
+Piloting Arduino: (Slave device)
+- handles the motor driver and tank movement
+- reads the front ultrasonic (Front facing) and scan arm sensors
+- reads the MPU-6050
+- moves the pan/tilt arm
+- reads MPU
+
+Devices will communicate via I2C. (Faster communication)
+
+Scouting Arduino: (Master device)
+- reads 6 IR Sensors
+- reads 5 US Sensors
+- sends obstacle distances back to the master
+
+
+
+Both boards are standard Uno R3 boards with ATmega328P chips.
