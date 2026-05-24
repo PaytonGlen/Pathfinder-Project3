@@ -31,16 +31,18 @@ struct ScanResult {
   int  usDist;     // shoulder US distance in cm (0 means timeout = far)
   int  irRaw;      // raw IR analogRead (0-1023, higher = closer)
   bool blocked;    // true if both sensors see something close. Redundancy to keep system from seeing ghosts
+  int prevDist;    // this variable needs to hold the previous scan
 };
 
 // returns a scan result struct. Accepts a struct as argument
-ScanResult SensorDetect(SensorDirection& s)
+ScanResult SensorDetect(SensorDirection& s, ScanResult& prev)
 {
     // create a struct within this function to hold values
     ScanResult r;
 
-    // read values from the argument struct, then assign those to the newly made struct
-    r.usDist = readDistanceCm(s); 
+    r.prevDist = prev.usDist;  // grab last scan's distance
+    r.usDist = readDistanceCm(s);  // now take the new reading
+
     r.irRaw = analogRead(s.irPin);
 
     bool usBlocked = (r.usDist > 0 && r.usDist < CLEAR_DISTANCE_CM);
@@ -52,7 +54,7 @@ ScanResult SensorDetect(SensorDirection& s)
     return r;
 };
 
-void objectDetected(byte direction);
+void objectDetected(byte direction, int usDist, int irRaw, int prevDist);
 void ScanAll(SensorDirection Sensors[], ScanResult readings[], int count);
 
 // when drivingForward(), make sure to call this with count = 2
@@ -61,20 +63,24 @@ void decideAndTurn(ScanResult readings[], int count)
     for (int i = 0; i < count; i++) {
     if (readings[i].blocked) {
         // something is close in direction i — react
-        objectDetected(i);
+        objectDetected(i, readings[i].usDist, readings[i].irRaw, readings[i].prevDist);
     }
   }
 };
 
-void objectDetected(byte direction)
+void objectDetected(byte direction, int usDist, int irRaw, int prevDist)
 {
+    // theres a problem that this function only receives one scan
+    int firstScan;  // this should take the average
+    int secondScan; // this should take the average of the second scan
+
     // needs to do something when object is detected at 11 o clock
     // so it should be called like: objectedDetected(11 o clock)
     
     switch (direction)
     {
         case 0:     // this is 1 o'clock direction
-            
+            calculateSpeeds();
             break;
         case 1:
             LEFT_MOTOR_SPEED;   //
@@ -103,7 +109,7 @@ void ScanAll(SensorDirection Sensors[], ScanResult readings[], int count)
 {
     for (int i = 0; i < count; i++)
     {
-        readings[i] = SensorDetect(Sensors[i]);
+        readings[i] = SensorDetect(Sensors[i], readings[i]);
     }
 };
 
