@@ -1,12 +1,9 @@
-/* 
-    This will be where the code that processes the ultrasonic sensor logic lives.
-*/
-
-#include <IrSensor.h>
 #include <Pins.h>
 #include <NetworkVars.h>
+#include <IrSensor.h>
 
-// make each couple of sensors their own group
+
+
 struct SensorDirection
 {
     // points to the first char of the string (array of char's)
@@ -16,7 +13,7 @@ struct SensorDirection
     int trigPin;
     int echoPin;
     int irPin;
-}
+};
 
 // make an array of all of the sensor groups to iterate through them easily
 SensorDirection Sensors[6] = 
@@ -27,7 +24,7 @@ SensorDirection Sensors[6] =
     { "7 o'clock", US_Sensor4_Trig_Pin, US_Sensor4_Echo_Pin, IR_Sensor4_Pin},
     { "9 o'clock", US_Sensor5_Trig_Pin, US_Sensor5_Echo_Pin, IR_Sensor5_Pin},
     { "11 o'clock", US_Sensor6_Trig_Pin, US_Sensor6_Echo_Pin, IR_Sensor6_Pin}
-}
+};
 
 // create a structure to hold the result of the scans.
 // The goal should be to make an array of these scan results, or maybe a struct
@@ -54,7 +51,7 @@ ScanResult SensorDetect(SensorDirection& s)
 
     // return the newly made struct with the new data
     return r;
-}
+};
 
 // when drivingForward(), make sure to call this with count = 2
 void decideAndTurn(ScanResult readings[], int count)
@@ -65,8 +62,7 @@ void decideAndTurn(ScanResult readings[], int count)
         objectDetected(i);
     }
   }
-}
-
+};
 
 void objectDetected(byte direction)
 {
@@ -76,28 +72,34 @@ void objectDetected(byte direction)
     switch (direction)
     {
         case 0:     // this is 1 o'clock direction
-            
-
+            LEFT_MOTOR_SPEED;   // reduce speed 25% - turn left
+            RIGHT_MOTOR_SPEED;  // keep at same speed (or slight increase)
+            break;
+        case 1:
+            LEFT_MOTOR_SPEED;   //
+            RIGHT_MOTOR_SPEED;
+            break;
+        case 2:
+            LEFT_MOTOR_SPEED;
+            RIGHT_MOTOR_SPEED;
+            break;
+        case 3:
+            LEFT_MOTOR_SPEED;
+            RIGHT_MOTOR_SPEED;
+            break;
+        case 4:
+            LEFT_MOTOR_SPEED;
+            RIGHT_MOTOR_SPEED;
+            break;
+        case 5:
+            LEFT_MOTOR_SPEED;
+            RIGHT_MOTOR_SPEED;
+            break;
     }
-}
+};
 
-
-int readDistanceCm(SensorDirection& s) {
-  digitalWrite(s.trigPin, LOW);
-  delayMicroseconds(2);
-  digitalWrite(s.trigPin, HIGH);
-  delayMicroseconds(10);
-  digitalWrite(s.trigPin, LOW);
-
-  unsigned long pulseDuration = pulseIn(s.echoPin, HIGH, ECHO_TIMEOUT_US);
-  if (pulseDuration == 0) return 0;
-  return pulseDuration / 58;
-}
-
-ScanResult ScanAll(SensorDirection Sensors[], int count)
+ScanResult ScanAll(SensorDirection Sensors[], ScanResult readings[], int count)
 {
-    ScanResult readings[6];
-
     for (int i = 0; i < count; i++)
     {
         readings[i] = SensorDetect(Sensors[i]);
