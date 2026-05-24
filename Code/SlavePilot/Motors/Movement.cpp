@@ -26,10 +26,13 @@ if (oneoclk_dtc == True || threeoclk_dtc == True || nineoclk_dtc == True || teno
 {
 right_Turnspd= K*((1/oneoclk_dist) + (1/threeoclk_dist) + (1/fiveoclk_dist))
 left_TurnSpd = K*((1/sevenoclk_dist) + (1/nineoclk_dist) + (1/tenoclk_dist))
+}
+if (right_Turnspd > left-turnspd-(left_turnspd*0.05) && righ_turnspd < left_turnspd+(leftturnspd*0.05)
+{
+left_turnspd = right_turnspd
+}
 RIGHT_DRIVE_SPEED = RIGHT_DRIVE_SPEED - left_Turnspd
 RIGHT_DRIVE_SPEED = RIGHT_DRIVE_SPEED - right_Turnspd
-}
-
 */
 
 
