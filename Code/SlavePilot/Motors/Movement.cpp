@@ -40,7 +40,7 @@ if (twelveoclk_dtc == true) //A obstacle directly ahead
     {
     pivoting_right = false;
   }
-  if (tenoclk == True) // Turns right when there is an opening to the right whether one is available to the left or not
+  if (tenoclk == true) // Turns right when there is an opening to the right whether one is available to the left or not
   starttime_lturn = millis();
   pivoting_left = true;
   }
