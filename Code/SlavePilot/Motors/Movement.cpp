@@ -20,29 +20,41 @@ void reverse(unsigned long durationMs) {
 
 // This might have an issue where the speeds continuosly decrease as new obstacles are found without returning to the original speed
 /*
-if (oneoclk_dtc == True || threeoclk_dtc == True || nineoclk_dtc == True || tenoclk_dtc == True || (fiveoclk_dtc == True && fiveoclk_dist < 50) || (sevenoclk_dtc ==True && sevenoclk_dist < 50)
+if (oneoclk_dtc == true || threeoclk_dtc == true || nineoclk_dtc == true || tenoclk_dtc == true || (fiveoclk_dtc == True && fiveoclk_dist < 50) || (sevenoclk_dtc ==True && sevenoclk_dist < 50))
 {
-right_Turnspd= K*((1/oneoclk_dist) + (1/threeoclk_dist) + (1/fiveoclk_dist))
-left_TurnSpd = K*((1/sevenoclk_dist) + (1/nineoclk_dist) + (1/tenoclk_dist))
+right_Turnspd= K*((1.0/oneoclk_dist) + (1.0/threeoclk_dist) + (1.0/fiveoclk_dist))
+left_TurnSpd = K*((1.0/sevenoclk_dist) + (1.0/nineoclk_dist) + (1.0/tenoclk_dist))
 }
-if (twelveoclk_dtc == True) //A obstacle directly ahead
+if (twelveoclk_dtc == true) //A obstacle directly ahead
 {
-  if (tenoclk_dtc == True && oneoclk_dtc == false) //Left turn so long as left is the only option
+  if (oneoclk_dtc == True && tenoclk_dtc == false) //Left turn so long as left is the only option
+  {
   starttime_rturn=millis();
-  while (millis-startime_rturn > 1500)
-  {
-  RIGHT_DRIVE_SPEED = 800;
-  LEFT_DRIVE_SPEED = -793;
+  pivoting_right = true;
+    if (millis-startime_rturn < 1500)
+    {
+    RIGHT_DRIVE_SPEED = 800;
+    LEFT_DRIVE_SPEED = -793;
+    }
+    else
+    {
+    pivoting_right = false;
   }
-  if (oneoclk == True) // Turns right when there is an opening to the right whether one is available to the left or not
+  if (tenoclk == True) // Turns right when there is an opening to the right whether one is available to the left or not
   starttime_lturn = millis();
-  while (millis-starttime_lturn > 1500)
-  {
-  RIGHT_DRIVE_SPEED = -800;
-  LEFT_DRIVE_SPEED = 793;
+  pivoting_left = true;
   }
-}
-if (right_turnspd > left_turnspd-(left_turnspd*0.05) && righ_turnspd < left_turnspd+(leftturnspd*0.05)
+    if (millis-starttime_lturn < 1500)
+    {
+    RIGHT_DRIVE_SPEED = -800;
+    LEFT_DRIVE_SPEED = 793;
+    }
+    else
+    {
+    pivoting_left = false;
+    }
+  }
+if (right_turnspd > left_turnspd-(left_turnspd*0.05) && righ_turnspd < left_turnspd+(left_turnspd*0.05)
 {
 left_turnspd = right_turnspd
 }
