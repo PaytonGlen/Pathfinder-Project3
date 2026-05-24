@@ -4,12 +4,22 @@
 #include "MotorControl.h"
 #include "../Config/DriveConfig.h"
 
+// so driveForward() should receive corrections from the PD_Loop()
+
+void driveForward(int rightMotorSpeed, int leftMotorSpeed)
+{
+    setRightTrack(true, rightMotorSpeed);
+    setLeftTrack(true, leftMotorSpeed);
+}
+
+/*
 void driveForward(unsigned long durationMs) {
   setRightTrack(true, RIGHT_DRIVE_SPEED);
   setLeftTrack(true, LEFT_DRIVE_SPEED);
   delay(durationMs);
   stopMotors();
 }
+*/
 
 void reverse(unsigned long durationMs) {
   setRightTrack(false, RIGHT_DRIVE_SPEED);

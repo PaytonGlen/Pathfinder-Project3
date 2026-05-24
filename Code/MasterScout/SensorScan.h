@@ -1,8 +1,7 @@
 #include <Pins.h>
 #include <NetworkVars.h>
 #include <IrSensor.h>
-
-
+#include <Calculations.h>
 
 struct SensorDirection
 {
@@ -31,7 +30,7 @@ SensorDirection Sensors[6] =
 struct ScanResult {
   int  usDist;     // shoulder US distance in cm (0 means timeout = far)
   int  irRaw;      // raw IR analogRead (0-1023, higher = closer)
-  bool blocked;    // true if EITHER sensor sees something close
+  bool blocked;    // true if both sensors see something close. Redundancy to keep system from seeing ghosts
 };
 
 // returns a scan result struct. Accepts a struct as argument
@@ -53,11 +52,14 @@ ScanResult SensorDetect(SensorDirection& s)
     return r;
 };
 
+void objectDetected(byte direction);
+void ScanAll(SensorDirection Sensors[], ScanResult readings[], int count);
+
 // when drivingForward(), make sure to call this with count = 2
 void decideAndTurn(ScanResult readings[], int count)
 {
     for (int i = 0; i < count; i++) {
-    if (readings[i].usDist < 20 && readings[i].irRaw > threshold) {
+    if (readings[i].blocked) {
         // something is close in direction i — react
         objectDetected(i);
     }
@@ -72,8 +74,7 @@ void objectDetected(byte direction)
     switch (direction)
     {
         case 0:     // this is 1 o'clock direction
-            LEFT_MOTOR_SPEED;   // reduce speed 25% - turn left
-            RIGHT_MOTOR_SPEED;  // keep at same speed (or slight increase)
+            
             break;
         case 1:
             LEFT_MOTOR_SPEED;   //
@@ -92,18 +93,17 @@ void objectDetected(byte direction)
             RIGHT_MOTOR_SPEED;
             break;
         case 5:
-            LEFT_MOTOR_SPEED;
-            RIGHT_MOTOR_SPEED;
+            LEFT_MOTOR_SPEED;       // keep at same speed
+            RIGHT_MOTOR_SPEED;      // reduce right motor by 25% - turn right
             break;
     }
 };
 
-ScanResult ScanAll(SensorDirection Sensors[], ScanResult readings[], int count)
+void ScanAll(SensorDirection Sensors[], ScanResult readings[], int count)
 {
     for (int i = 0; i < count; i++)
     {
         readings[i] = SensorDetect(Sensors[i]);
     }
+};
 
-    return readings;
-}
