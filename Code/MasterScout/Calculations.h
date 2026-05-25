@@ -9,8 +9,8 @@ struct Motor_Speeds
     int RIGHT_DRIVE_SPEED;
 };
 
-const byte const_LEFT_DRIVE_SPEED = 173;
-const byte const_RIGHT_DRIVE_SPEED = 180;
+const byte const_LEFT_DRIVE_SPEED = 125;
+const byte const_RIGHT_DRIVE_SPEED = 130;
 
 int derivative(int firstScan, int secondScan)
 {
@@ -33,15 +33,15 @@ int PD_Loop(int currentDist, int firstScan, int secondScan)
     return correction;  // positive = steer away, negative = ease back
 }
 
-Motor_Speeds calculateSpeeds(int correction, int sensorIndex)
+Motor_Speeds calculateSpeeds(int sensorIndex, int correction)
 {
-    if (sensorIndex <= 3)   // object on the right-hand side. Turn left
+    if (sensorIndex <= 2)   // object on the right-hand side. Turn left
     {
-        int left_speed = const_LEFT_DRIVE_SPEED;    // reduce this one
-        int right_speed = const_RIGHT_DRIVE_SPEED;
+        int left_speed = const_LEFT_DRIVE_SPEED - correction;    // reduce this one
+        int right_speed = const_RIGHT_DRIVE_SPEED + correction;
     } else 
     {
-        int left_speed = const_LEFT_DRIVE_SPEED;    
-        int right_speed = const_RIGHT_DRIVE_SPEED;  // reduce this one
+        int left_speed = const_LEFT_DRIVE_SPEED + correction;    
+        int right_speed = const_RIGHT_DRIVE_SPEED - correction;  // reduce this one
     }
 }
