@@ -58,7 +58,7 @@ void objectDetected(byte direction, int usDist, int irRaw, int prevDist);
 void ScanAll(SensorDirection Sensors[], ScanResult readings[], int count);
 
 // when drivingForward(), make sure to call this with count = 2
-void decideAndTurn(ScanResult readings[], int count)
+void direction(ScanResult readings[], int count)
 {
     for (int i = 0; i < count; i++) {
     if (readings[i].blocked) {
@@ -74,6 +74,13 @@ void objectDetected(byte direction, int usDist, int irRaw, int prevDist)
     int firstScan;  // this should take the average
     int secondScan; // this should take the average of the second scan
 
+    // these are to hold the correction obtained from running calculateSpeeds
+    int case1;
+    int case2;
+    int case3;
+    int case4;
+    int case5;
+
     // needs to do something when object is detected at 11 o clock
     // so it should be called like: objectedDetected(11 o clock)
     
@@ -83,8 +90,7 @@ void objectDetected(byte direction, int usDist, int irRaw, int prevDist)
             calculateSpeeds();
             break;
         case 1:
-            LEFT_MOTOR_SPEED;   //
-            RIGHT_MOTOR_SPEED;
+            calculateSpeeds();
             break;
         case 2:
             LEFT_MOTOR_SPEED;
@@ -110,6 +116,11 @@ void ScanAll(SensorDirection Sensors[], ScanResult readings[], int count)
     for (int i = 0; i < count; i++)
     {
         readings[i] = SensorDetect(Sensors[i], readings[i]);
+
+        /*
+        readings[0] = SensorDetect(Sensors[0], readings[0])
+        SensorDetect returns a ScanResult structure. { usDist, irRaw, blocked, prevDist}
+        */
     }
 };
 
