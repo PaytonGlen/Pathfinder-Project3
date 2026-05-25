@@ -2,6 +2,9 @@
 #include <NetworkVars.h>
 #include <IrSensor.h>
 #include <Calculations.h>
+#include <US_Logic.h>
+
+int current_US_dist = 0;
 
 struct SensorDirection
 {
@@ -32,6 +35,10 @@ struct ScanResult {
   int  irRaw;      // raw IR analogRead (0-1023, higher = closer)
   bool blocked;    // true if both sensors see something close. Redundancy to keep system from seeing ghosts
   int prevDist;    // this variable needs to hold the previous scan
+
+  // these are needed in order to get a current distance reading for PID loop
+  byte echoPin;
+  byte trigPin; 
 };
 
 // returns a scan result struct. Accepts a struct as argument
@@ -41,7 +48,11 @@ ScanResult SensorDetect(SensorDirection& s, ScanResult& prev)
     ScanResult r;
 
     r.prevDist = prev.usDist;  // grab last scan's distance
-    r.usDist = readDistanceCm(s);  // now take the new reading
+    r.usDist = readDistanceCm(s.trigPin, s.echoPin);  // now take the new reading
+
+    // pass over the variables
+    r.echoPin = s.echoPin;
+    r.trigPin = s.trigPin;
 
     r.irRaw = analogRead(s.irPin);
 
@@ -54,7 +65,7 @@ ScanResult SensorDetect(SensorDirection& s, ScanResult& prev)
     return r;
 };
 
-void objectDetected(byte direction, int usDist, int irRaw, int prevDist);
+Motor_Speeds objectDetected(byte direction, ScanResult& reading);
 void ScanAll(SensorDirection Sensors[], ScanResult readings[], int count);
 
 // when drivingForward(), make sure to call this with count = 2
@@ -63,52 +74,14 @@ void direction(ScanResult readings[], int count)
     for (int i = 0; i < count; i++) {
     if (readings[i].blocked) {
         // something is close in direction i — react
-        objectDetected(i, readings[i].usDist, readings[i].irRaw, readings[i].prevDist);
+        objectDetected(i, readings[i]);
     }
   }
 };
 
-void objectDetected(byte direction, int usDist, int irRaw, int prevDist)
+Motor_Speeds objectDetected(byte direction, ScanResult& reading)
 {
-    // theres a problem that this function only receives one scan
-    int firstScan;  // this should take the average
-    int secondScan; // this should take the average of the second scan
-
-    // these are to hold the correction obtained from running calculateSpeeds
-    int case1;
-    int case2;
-    int case3;
-    int case4;
-    int case5;
-
-    // needs to do something when object is detected at 11 o clock
-    // so it should be called like: objectedDetected(11 o clock)
-    
-    switch (direction)
-    {
-        case 0:     // this is 1 o'clock direction
-            calculateSpeeds();
-            break;
-        case 1:
-            calculateSpeeds();
-            break;
-        case 2:
-            LEFT_MOTOR_SPEED;
-            RIGHT_MOTOR_SPEED;
-            break;
-        case 3:
-            LEFT_MOTOR_SPEED;
-            RIGHT_MOTOR_SPEED;
-            break;
-        case 4:
-            LEFT_MOTOR_SPEED;
-            RIGHT_MOTOR_SPEED;
-            break;
-        case 5:
-            LEFT_MOTOR_SPEED;       // keep at same speed
-            RIGHT_MOTOR_SPEED;      // reduce right motor by 25% - turn right
-            break;
-    }
+    return calculateSpeeds(direction, PD_Loop(reading.usDist, reading.prevDist, reading.usDist));
 };
 
 void ScanAll(SensorDirection Sensors[], ScanResult readings[], int count)

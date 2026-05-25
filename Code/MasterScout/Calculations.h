@@ -20,10 +20,10 @@ int derivative(int firstScan, int secondScan)
 }
 
 
-int PD_Loop(int currentDist, int firstScan, int secondScan)
+int PD_Loop(int firstScan, int secondScan)
 {
     int targetDist = 6;  // desired distance from wall in inches
-    int error = currentDist - targetDist;
+    int error = firstScan - targetDist;
     int d = derivative(firstScan, secondScan);
 
     const int Kp = 3;   // tune these on the actual hardware
