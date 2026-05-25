@@ -1,5 +1,5 @@
 #include <Pins.h>
-#include <NetworkVars.h>
+#include <Variables.h>
 #include <SensorScan.h>
 #include <Calculations.h>
 
@@ -12,5 +12,6 @@ void loop()
 
     ScanAll(Sensors, readings, count);
 
-    SensorDetect(Sensors, readings)
+    direction(readings, count);
+
 }
