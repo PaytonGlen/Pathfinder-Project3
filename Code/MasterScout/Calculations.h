@@ -35,13 +35,17 @@ int PD_Loop(int currentDist, int firstScan, int secondScan)
 
 Motor_Speeds calculateSpeeds(int sensorIndex, int correction)
 {
+    Motor_Speeds Adjustments;
+
     if (sensorIndex <= 2)   // object on the right-hand side. Turn left
     {
-        int left_speed = const_LEFT_DRIVE_SPEED - correction;    // reduce this one
-        int right_speed = const_RIGHT_DRIVE_SPEED + correction;
+        Adjustments.LEFT_DRIVE_SPEED = const_LEFT_DRIVE_SPEED - correction;    // reduce this one
+        Adjustments.RIGHT_DRIVE_SPEED = const_RIGHT_DRIVE_SPEED + correction;
     } else 
     {
-        int left_speed = const_LEFT_DRIVE_SPEED + correction;    
-        int right_speed = const_RIGHT_DRIVE_SPEED - correction;  // reduce this one
+        Adjustments.LEFT_DRIVE_SPEED = const_LEFT_DRIVE_SPEED + correction;    
+        Adjustments.RIGHT_DRIVE_SPEED = const_RIGHT_DRIVE_SPEED - correction;  // reduce this one
     }
+
+    return Adjustments;
 }
