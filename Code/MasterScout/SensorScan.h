@@ -59,6 +59,17 @@ ScanResult SensorDetect(SensorDirection& s, ScanResult& prev)
     bool usBlocked = (r.usDist > 0 && r.usDist < CLEAR_DISTANCE_CM);
     bool irBlocked = (r.irRaw > IR_OBSTACLE_THRESHOLD);
 
+    Serial.println("IR Obstacle threshold: ");
+    Serial.println(IR_OBSTACLE_THRESHOLD);
+
+    Serial.println("Raw IR Value: ");
+    Serial.println(r.irRaw);
+
+    Serial.println("us Dist Value: ");
+    Serial.println(r.usDist);
+
+
+
     r.blocked = usBlocked && irBlocked;
 
     // return the newly made struct with the new data
@@ -81,7 +92,10 @@ void direction(ScanResult readings[], int count)
 
 Motor_Speeds objectDetected(byte direction, ScanResult& reading)
 {
-    return calculateSpeeds(direction, PD_Loop(reading.usDist, reading.prevDist, reading.usDist));
+    Motor_Speeds calculation_result = calculateSpeeds(direction, PD_Loop(reading.usDist, reading.prevDist));
+    Serial.println("calculation_result: ");
+    Serial.println(calculation_result);
+    return calculation_result;
 };
 
 void ScanAll(SensorDirection Sensors[], ScanResult readings[], int count)
@@ -89,7 +103,9 @@ void ScanAll(SensorDirection Sensors[], ScanResult readings[], int count)
     for (int i = 0; i < count; i++)
     {
         readings[i] = SensorDetect(Sensors[i], readings[i]);
-
+        Serial.println("readings[i]: ");
+        Serial.println(readings[i]);
+        
         /*
         readings[0] = SensorDetect(Sensors[0], readings[0])
         SensorDetect returns a ScanResult structure. { usDist, irRaw, blocked, prevDist}
