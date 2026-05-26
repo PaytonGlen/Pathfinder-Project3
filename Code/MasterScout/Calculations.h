@@ -22,7 +22,7 @@ int derivative(int firstScan, int secondScan)
 
 int PD_Loop(int firstScan, int secondScan)
 {
-    int targetDist = 6;  // desired distance from wall in inches
+    int targetDist = 6;  // desired distance from wall in inches. May need tuning
     int error = firstScan - targetDist;
     int d = derivative(firstScan, secondScan);
 
