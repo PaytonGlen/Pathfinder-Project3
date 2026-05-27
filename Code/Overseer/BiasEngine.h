@@ -80,30 +80,46 @@ void logBiasUpdate(uint8_t conf)
 }
 
 // ─── Adaptive KP/KD ──────────────────────────────────────────────────────────
-// Adjusts PD gains based on global turn success rate and oscillation.
-// Sent back to Scout as KP,<val> and KD,<val> packets.
+// Adjusts PD gains based on a smoothed turn success rate and oscillation count.
+//
+// Uses an EMA of per-window success rate (turnSuccessRateEma) rather than the
+// raw window rate. This prevents a single cluttered-environment window from
+// swinging gains far in the wrong direction.
+//
+// Gain update steps are also scaled by confidence: below GAIN_CONF_THRESH the
+// step is halved, so early-run data causes only tentative adjustments.
 
 void updateGains()
 {
     if (turnTracker.totalTurns < MIN_TURNS_FOR_KP) return;
 
-    uint8_t successPct = (uint8_t)((uint32_t)turnTracker.successfulTurns * 100
-                                   / turnTracker.totalTurns);
+    // Update the turn success EMA with this window's rate
+    int16_t windowSuccessPct = (turnTracker.totalTurns > 0)
+        ? (int16_t)((uint32_t)turnTracker.successfulTurns * 100 / turnTracker.totalTurns)
+        : 50;
+    turnSuccessRateEma += (windowSuccessPct - turnSuccessRateEma) >> GAIN_EMA_SHIFT;
 
-    // Poor turn success → increase Kp to react more aggressively to obstacles
-    if (successPct < 35)
-        adaptiveKp = constrain(adaptiveKp + 0.4f, KP_MIN, KP_MAX);
-    // Excellent success and low oscillation → can afford to relax
-    else if (successPct > 75 && oscillationCount <= HIGH_OSCIL_THRESH)
-        adaptiveKp = constrain(adaptiveKp - 0.2f, KP_MIN, KP_MAX);
+    // Confidence gate: scale step size down when data is sparse
+    uint8_t conf = computeConfidence();
+    float   step = (conf >= GAIN_CONF_THRESH) ? 1.0f : 0.5f;
 
-    // High oscillation → increase Kd to damp rapid corrections
+    // ── Kp: driven by smoothed turn success rate ──────────────────────────────
+    // Poor success  → raise Kp (react more aggressively to obstacles)
+    // Strong success with low oscillation → gently lower Kp
+    if (turnSuccessRateEma < 35)
+        adaptiveKp = constrain(adaptiveKp + 0.4f * step, KP_MIN, KP_MAX);
+    else if (turnSuccessRateEma > 75 && oscillationCount <= HIGH_OSCIL_THRESH)
+        adaptiveKp = constrain(adaptiveKp - 0.2f * step, KP_MIN, KP_MAX);
+
+    // ── Kd: driven by oscillation rate ───────────────────────────────────────
+    // High oscillation → raise Kd to damp rapid corrections
+    // Stable run → allow Kd to drift back toward baseline
     if (oscillationCount > HIGH_OSCIL_THRESH)
-        adaptiveKd = constrain(adaptiveKd + 0.3f, KD_MIN, KD_MAX);
+        adaptiveKd = constrain(adaptiveKd + 0.3f * step, KD_MIN, KD_MAX);
     else if (oscillationCount == 0 && adaptiveKd > KD_BASE)
-        adaptiveKd = constrain(adaptiveKd - 0.1f, KD_MIN, KD_MAX);
+        adaptiveKd = constrain(adaptiveKd - 0.1f * step, KD_MIN, KD_MAX);
 
-    // Send to Scout (integers — Scout uses int Kp/Kd)
+    // Send to Scout (Scout stores Kp/Kd as ints)
     Serial1.print(F("KP,"));
     Serial1.println((int)(adaptiveKp + 0.5f));
     Serial1.print(F("KD,"));

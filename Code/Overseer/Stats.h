@@ -62,9 +62,14 @@ uint8_t  oscilPacketsSeen  = 0;   // state packets in current oscillation window
 bool     lastStateWasTracking = true;
 
 // ─── Adaptive Gains ──────────────────────────────────────────────────────────
+// adaptiveKp/Kd are adjusted by updateGains() in BiasEngine.h.
+// turnSuccessRateEma is an EMA of per-window turn success % (0–100).
+// Using an EMA here instead of the raw window rate prevents a single bad window
+// (e.g. one missed turn in a cluttered corner) from swinging gains too far.
 
-float adaptiveKp = KP_BASE;
-float adaptiveKd = KD_BASE;
+float   adaptiveKp          = KP_BASE;
+float   adaptiveKd          = KD_BASE;
+int16_t turnSuccessRateEma  = 50;   // initialise to 50% — neutral, no prior data
 
 // ─── Reset ───────────────────────────────────────────────────────────────────
 
@@ -93,6 +98,7 @@ void resetStats()
     lastStateWasTracking = true;
     adaptiveKp           = KP_BASE;
     adaptiveKd           = KD_BASE;
+    turnSuccessRateEma   = 50;
 }
 
 void resetWindowAccumulators()

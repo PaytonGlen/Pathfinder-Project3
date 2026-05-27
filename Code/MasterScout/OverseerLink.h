@@ -1,18 +1,29 @@
-// Scout → Overseer serial link over Serial3.
-// Streams periodic telemetry packets for SD logging and parameter tuning.
-// Also listens for parameter updates sent back from the Overseer.
+// Scout → Overseer serial link over Serial3 @ 115200 baud.
+// Streams periodic telemetry packets for SD logging and adaptive tuning.
+// Listens for parameter updates sent back from the Overseer.
 //
-// Packet types sent TO Overseer:
+// ── Packets sent TO Overseer (Scout → Serial3 TX) ────────────────────────────
 //   STATE,<TRACKING|AVOIDING>
-//   SENSOR,<index>,<usDist>,<irRaw>,<blocked>,<gapDetected>
-//   BEACON,<heading>,<beaconHeading>
+//   SENSOR,<idx>,<usDist>,<irRaw>,<blocked>,<gapDetected>
+//       idx 0–5 = clock position (0=1o'clock … 5=11o'clock)
+//       blocked/gapDetected = 0 or 1
+//   BEACON,<heading>
+//       heading = servo angle of strongest RSSI (0–180°)
 //   PARAMS,<Kp>,<Kd>
-//   TURN,<direction>,<usDist>      — sent by TurnLog.h
-//   CLEAR                          — sent by TurnLog.h
+//       Scout's current PD gains — sent each telemetry cycle for Overseer reference
+//   TURN,<sensorIdx>,<usDist>      — sent by TurnLog.h on each committed turn
+//       sensorIdx = gap sensor that triggered the turn (0–5)
+//   CLEAR                          — sent by TurnLog.h on clearTurnLog()
 //
-// Packet types received FROM Overseer:
-//   KP,<value>   — update proportional gain
-//   KD,<value>   — update derivative gain
+// ── Packets received FROM Overseer (Overseer Serial1 TX → Scout Serial3 RX) ──
+//   KP,<value>                     — set Scout's overseerKp
+//   KD,<value>                     — set Scout's overseerKd
+//   BIAS,<b0>,<b1>,<b2>,<b3>,<b4>,<b5>,<conf>
+//       6 bias values (1–5) + confidence (0–100).
+//       conf >= 70 → hard-set; conf < 70 → blend with current value.
+//   BIAS_DELTA,<idx>,<delta>
+//       Single-sensor emergency update. Applied immediately, no blending.
+//       delta is typically +1 or -1.
 
 #ifndef OVERSEER_LINK_H
 #define OVERSEER_LINK_H

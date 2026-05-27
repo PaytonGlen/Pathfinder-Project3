@@ -15,7 +15,8 @@ static uint8_t rxLen = 0;
 void handleTurn(char* data)
 {
     // TURN,<sensorIdx>,<usDist>
-    // sensorIdx is the clock-position sensor (0–5) that triggered the gap turn.
+    // sensorIdx = clock-position sensor (0–5) that triggered the gap turn.
+    // usDist    = ultrasonic distance at moment of turn commit (cm).
     char line[48];
     snprintf(line, sizeof(line), "%lu,%s", millis(), data);
     appendLine(TURN_LOG, line);
@@ -59,7 +60,7 @@ void handleSensor(char* data)
     // ── False-positive detection ──────────────────────────────────────────────
     // FP = IR says blocked (high raw value) but US reads clearly far.
     // Suggests sensor noise, reflective surface, or miscalibration.
-    bool irBlocked = (irRaw > 125);  // matches IR_OBSTACLE_THRESHOLD in Scout
+    bool irBlocked = (irRaw > IR_BLOCK_RAW_THRESHOLD);  // defined in Config.h — must match Scout's IR_OBSTACLE_THRESHOLD in Variables.h
     bool usClear   = (usDist > FP_US_MIN_CM);
     if (irBlocked && usClear && !blocked)
         stats[idx].fpCount++;

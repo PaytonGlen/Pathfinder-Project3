@@ -55,6 +55,9 @@ const float BIAS_DELTA_MAX    = 2.0f;   // maximum swing from BASE in either dir
 
 // ─── False-Positive Detection ─────────────────────────────────────────────────
 const uint8_t FP_US_MIN_CM = 18;        // US must read > this for IR-block to count as FP
+// Must match IR_OBSTACLE_THRESHOLD in Scout's Variables.h.
+// If you change the threshold on Scout, update this value too.
+const int     IR_BLOCK_RAW_THRESHOLD = 125;
 
 // ─── Event-Triggered Updates ─────────────────────────────────────────────────
 const uint8_t EMERGENCY_CLOSE_CALLS = 4;  // close calls in window before immediate delta send
@@ -65,13 +68,18 @@ const uint8_t HIGH_OSCIL_THRESH  = 8;    // transitions above this = unstable
 
 // ─── Adaptive KP/KD ──────────────────────────────────────────────────────────
 // Sent back to Scout when turn success or recovery time indicates gains need adjustment.
-const float   KP_BASE         = 3.0f;
-const float   KD_BASE         = 1.0f;
-const float   KP_MAX          = 5.0f;
-const float   KP_MIN          = 1.5f;
-const float   KD_MAX          = 3.0f;
-const float   KD_MIN          = 0.5f;
+const float   KP_BASE          = 3.0f;
+const float   KD_BASE          = 1.0f;
+const float   KP_MAX           = 5.0f;
+const float   KP_MIN           = 1.5f;
+const float   KD_MAX           = 3.0f;
+const float   KD_MIN           = 0.5f;
 const uint8_t MIN_TURNS_FOR_KP = 5;     // wait for this many turns before adjusting KP/KD
+// Gain changes are gated on confidence to prevent drift from sparse/noisy windows.
+// Below this threshold the gain update step is scaled down proportionally.
+const uint8_t GAIN_CONF_THRESH = 50;    // confidence below 50 → half-step gain change
+// EMA for turn success rate used in gain adaptation (separate from per-sensor bias EMA).
+const uint8_t GAIN_EMA_SHIFT   = 3;     // alpha = 1/8 — slow smoothing, resists single bad window
 
 // ─── Confidence ───────────────────────────────────────────────────────────────
 // Confidence is 0–100. Scout blends vs hard-sets biases based on this.

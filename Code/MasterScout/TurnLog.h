@@ -1,7 +1,16 @@
-// Stack-based turn log stored in Scout EEPROM.
-// Each entry records the direction turned and distance at time of turn.
-// Entries can be popped to retrace the route in reverse.
+// Ring-buffer turn log stored in Scout EEPROM.
+// Each entry records the sensor index and distance at time of turn.
+// Entries can be popped newest-first to retrace the route in reverse.
 // Also streams each entry to the Overseer via Serial3 for SD logging.
+//
+// Layout:
+//   Bytes 0–1  count  — number of valid entries (0 to MAX_ENTRIES)
+//   Bytes 2–3  head   — index of the oldest entry (0 to MAX_ENTRIES-1)
+//   Bytes 4+   entries — ring slots, each ENTRY_SIZE bytes
+//
+// When the buffer is full, logTurn() overwrites the oldest slot (at head)
+// and advances head, so the log always holds the most recent MAX_ENTRIES turns.
+// popTurn() removes from the newest end (head + count - 1), preserving order.
 
 #ifndef TURN_LOG_H
 #define TURN_LOG_H
@@ -10,8 +19,6 @@
 #include <EEPROM.h>
 
 // ─── Entry Layout ────────────────────────────────────────────────────────────
-// Each TurnEntry is 3 bytes: direction (1) + usDist (2)
-// Stack grows upward from STACK_BASE. Stack pointer stored at address 0.
 
 struct TurnEntry
 {
@@ -19,72 +26,82 @@ struct TurnEntry
     int16_t usDist;     // ultrasonic distance at time of turn (cm)
 };
 
-const int  ENTRY_SIZE  = sizeof(TurnEntry);   // 3 bytes
-const int  STACK_BASE  = 2;                   // entries start at byte 2 (bytes 0–1 = stack pointer)
-const int  MAX_ENTRIES = (EEPROM.length() - STACK_BASE) / ENTRY_SIZE;
+const int ENTRY_SIZE  = sizeof(TurnEntry);  // 3 bytes
+const int HDR_SIZE    = 4;                  // bytes 0–1 = count, bytes 2–3 = head
+const int RING_BASE   = HDR_SIZE;
+const int MAX_ENTRIES = (EEPROM.length() - HDR_SIZE) / ENTRY_SIZE;
 
-// ─── Stack Pointer ────────────────────────────────────────────────────────────
+// ─── Header Accessors ────────────────────────────────────────────────────────
 
-// Returns current stack depth (number of logged turns)
-int turnCount()
-{
-    int count;
-    EEPROM.get(0, count);
-    if (count < 0 || count > MAX_ENTRIES) return 0;  // corrupted — treat as empty
-    return count;
-}
+static int  getCount() { int v; EEPROM.get(0, v); return (v < 0 || v > MAX_ENTRIES) ? 0 : v; }
+static int  getHead()  { int v; EEPROM.get(2, v); return (v < 0 || v >= MAX_ENTRIES) ? 0 : v; }
+static void setCount(int v) { EEPROM.put(0, v); }
+static void setHead(int v)  { EEPROM.put(2, v); }
 
-static void setTurnCount(int count)
-{
-    EEPROM.put(0, count);
-}
+// Returns current number of logged turns (0 to MAX_ENTRIES).
+int turnCount() { return getCount(); }
 
 // ─── Push / Pop ───────────────────────────────────────────────────────────────
 
 // Logs a turn to EEPROM and streams it to Overseer via Serial3.
-// Call when the car commits to turning into a gap.
+// If the buffer is full, the oldest entry is overwritten and head advances.
 void logTurn(uint8_t direction, int usDist)
 {
-    int count = turnCount();
-    if (count >= MAX_ENTRIES)
+    int count = getCount();
+    int head  = getHead();
+    int slot;
+
+    if (count < MAX_ENTRIES)
     {
-        Serial.println(F("TurnLog: EEPROM full, oldest entry overwritten"));
-        count = MAX_ENTRIES - 1;  // make room by capping (simple overflow handling)
+        // Buffer not full — write to next empty slot after newest entry
+        slot = (head + count) % MAX_ENTRIES;
+        setCount(count + 1);
+    }
+    else
+    {
+        // Buffer full — overwrite the oldest slot (at head) and advance head
+        slot = head;
+        setHead((head + 1) % MAX_ENTRIES);
+        // count stays at MAX_ENTRIES
     }
 
     TurnEntry entry = { direction, (int16_t)usDist };
-    int addr = STACK_BASE + (count * ENTRY_SIZE);
-    EEPROM.put(addr, entry);
-    setTurnCount(count + 1);
+    EEPROM.put(RING_BASE + slot * ENTRY_SIZE, entry);
 
-    // Stream to Overseer for SD logging
-    // Format: "TURN,<direction>,<usDist>\n"
+    // Stream to Overseer for SD logging: TURN,<sensorIdx>,<usDist>
     Serial3.print(F("TURN,"));
     Serial3.print(direction);
     Serial3.print(',');
     Serial3.println(usDist);
 
     #ifdef DEBUG
-        Serial.print(F("TurnLog push: dir="));
+        Serial.print(F("TurnLog push: slot="));
+        Serial.print(slot);
+        Serial.print(F(" dir="));
         Serial.print(direction);
         Serial.print(F(" dist="));
         Serial.println(usDist);
     #endif
 }
 
-// Retrieves and removes the most recent turn entry.
-// Returns false if the stack is empty (nothing to retrace).
+// Retrieves and removes the most recent turn entry (newest end of ring).
+// Returns false if the log is empty.
 bool popTurn(TurnEntry& out)
 {
-    int count = turnCount();
+    int count = getCount();
     if (count <= 0) return false;
 
-    int addr = STACK_BASE + ((count - 1) * ENTRY_SIZE);
-    EEPROM.get(addr, out);
-    setTurnCount(count - 1);
+    int head    = getHead();
+    int newest  = (head + count - 1) % MAX_ENTRIES;
+
+    EEPROM.get(RING_BASE + newest * ENTRY_SIZE, out);
+    setCount(count - 1);
+    // head does not move — we removed from the newest end
 
     #ifdef DEBUG
-        Serial.print(F("TurnLog pop: dir="));
+        Serial.print(F("TurnLog pop: slot="));
+        Serial.print(newest);
+        Serial.print(F(" dir="));
         Serial.print(out.direction);
         Serial.print(F(" dist="));
         Serial.println(out.usDist);
@@ -93,10 +110,11 @@ bool popTurn(TurnEntry& out)
     return true;
 }
 
-// Clears the turn log (resets stack pointer — does not erase EEPROM data).
+// Clears the ring buffer (resets count and head — does not erase EEPROM data).
 void clearTurnLog()
 {
-    setTurnCount(0);
+    setCount(0);
+    setHead(0);
     Serial3.println(F("CLEAR"));
 }
 
