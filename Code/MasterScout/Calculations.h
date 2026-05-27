@@ -1,62 +1,62 @@
 // The purpose of this code is to calculate motor speeds based on object detection (distances)
 #include <Arduino.h>
 
-
-typedef uint8_t byte;
+// Uncomment to enable serial debug output
+// #define DEBUG
 
 struct Motor_Speeds
 {
-    int LEFT_DRIVE_SPEED;
-    int RIGHT_DRIVE_SPEED;
+    uint8_t LEFT_DRIVE_SPEED;
+    uint8_t RIGHT_DRIVE_SPEED;
 };
 
-const byte const_LEFT_DRIVE_SPEED = 125;
-const byte const_RIGHT_DRIVE_SPEED = 130;
+const uint8_t const_LEFT_DRIVE_SPEED  = 125;
+const uint8_t const_RIGHT_DRIVE_SPEED = 130;
 
 int derivative(int firstScan, int secondScan)
 {
     int delta = firstScan - secondScan;
-    Serial.println("Derivative delta: ");
-    Serial.println(delta);
+    int sign  = (delta >= 0) ? 1 : -1;
 
-    int sign = (delta >= 0) ? 1 : -1;
-    Serial.println("Derivative sign: ");
-    Serial.println(sign);
+    #ifdef DEBUG
+        Serial.print("Derivative delta: "); Serial.println(delta);
+        Serial.print("Derivative sign: ");  Serial.println(sign);
+    #endif
 
     return sign * (delta * delta);
 }
 
-
 int PD_Loop(int firstScan, int secondScan)
 {
-    int targetDist = 6;  // desired distance from wall in inches. May need tuning
-    int error = firstScan - targetDist;
-    int d = derivative(firstScan, secondScan);
-     Serial.println("PD_Loop d_out: ");
-    Serial.println(d);
+    const int targetDist = 13;   // desired distance from wall in cm — tune on hardware
+    const int Kp         = 3;   // proportional gain — tune on hardware
+    const int Kd         = 1;   // derivative gain   — tune on hardware
 
-    const int Kp = 3;   // tune these on the actual hardware
-    const int Kd = 1;
-
+    int error      = firstScan - targetDist;
+    int d          = derivative(firstScan, secondScan);
     int correction = (Kp * error) + (Kd * d);
-    Serial.println("PD_Loop correction: ");
-    Serial.println(correction);
 
-    return correction;  // positive = steer away, negative = ease back
+    #ifdef DEBUG
+        Serial.print("PD_Loop d_out: ");     Serial.println(d);
+        Serial.print("PD_Loop correction: "); Serial.println(correction);
+    #endif
+
+    return correction;  // positive = steer away from obstacle, negative = ease back toward wall
 }
 
 Motor_Speeds calculateSpeeds(int sensorIndex, int correction)
 {
     Motor_Speeds Adjustments;
 
-    if (sensorIndex <= 2)   // object on the right-hand side. Turn left
+    if (sensorIndex <= 2)   // obstacle on the right — turn left
     {
-        Adjustments.LEFT_DRIVE_SPEED = const_LEFT_DRIVE_SPEED - correction;    // reduce this one
-        Adjustments.RIGHT_DRIVE_SPEED = const_RIGHT_DRIVE_SPEED + correction;
-    } else 
+        Adjustments.LEFT_DRIVE_SPEED  = constrain(const_LEFT_DRIVE_SPEED  - correction, 0, 255);
+        Adjustments.RIGHT_DRIVE_SPEED = constrain(const_RIGHT_DRIVE_SPEED + correction, 0, 255);
+    }
+    else                    // obstacle on the left — turn right
     {
-        Adjustments.LEFT_DRIVE_SPEED = const_LEFT_DRIVE_SPEED + correction;    
-        Adjustments.RIGHT_DRIVE_SPEED = const_RIGHT_DRIVE_SPEED - correction;  // reduce this one
+        Adjustments.LEFT_DRIVE_SPEED  = constrain(const_LEFT_DRIVE_SPEED  + correction, 0, 255);
+        Adjustments.RIGHT_DRIVE_SPEED = constrain(const_RIGHT_DRIVE_SPEED - correction, 0, 255);
     }
 
     return Adjustments;

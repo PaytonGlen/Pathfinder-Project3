@@ -1,31 +1,90 @@
+#include <Wire.h>
 #include <Pins.h>
 #include <Variables.h>
 #include <SensorScan.h>
 #include <Calculations.h>
-#include <SoftwareSerial.h>
+#include "Bluetooth/BT_Tracking.h"
+#include "TurnLog.h"
+#include "OverseerLink.h"
 
-
-SoftwareSerial BT(10,11);   // RX, TX
-ScanResult readings[6];
-
-const byte count = 6;
+const byte count      = 6;
+CarState currentState = TRACKING;  // start in TRACKING mode
 
 void setup()
 {
     Serial.begin(9600);
-    BT.begin(9600);
-    Serial.println("HM-10 ready");
+    Serial1.begin(9600);  // HM-10 left module
+    Serial2.begin(9600);  // HM-10 right module
+    Serial3.begin(9600);  // Overseer link (task 8)
+
+    Wire.begin();         // scout is I2C master
+    initScanArm();        // attach servo, center arm
+
+    clearTurnLog();       // fresh run — reset EEPROM stack and notify Overseer
+    Deep_Search();        // get initial beacon heading before moving
+
+    Serial.println(F("Scout ready"));
 }
 
 void loop()
 {
-     // Phone -> Serial Monitor
-    while (BT.available()) Serial.write(BT.read());
-
-    // Serial Monitor -> Phone
-    while (Serial.available()) BT.write(Serial.read());
-
+    // 1. Scan all sensors
     ScanAll(Sensors, readings, count);
-    direction(readings, count);
 
+    // 2. Update state based on sensor results
+    if (anyBlocked(readings, count))
+        currentState = AVOIDING;
+    else
+        currentState = TRACKING;
+
+    // 3. Act based on current state
+    switch (currentState)
+    {
+        case TRACKING:
+        {
+            driveForward();   // sends base speeds to pilot over I2C
+            Light_Search();   // non-blocking beacon sweep — updates beaconHeading
+
+            // Check if any sensor just detected a gap
+            int gap = gapDirection(readings, count);
+            if (gap != -1)
+            {
+                // Only turn into the gap if it roughly aligns with the beacon heading.
+                // beaconHeading is a servo angle (0–110). Map sensor index to rough angle:
+                // sensors 0–2 (right side) ≈ ARM_RIGHT half, sensors 3–5 (left) ≈ ARM_LEFT half
+                bool gapOnRight  = (gap <= 2);
+                bool beaconRight = (beaconHeading < ARM_CENTER);
+
+                if (gapOnRight == beaconRight)
+                {
+                    // Gap aligns with beacon — confirm heading then commit to turn
+                    Deep_Search();
+                    logTurn(gap, readings[gap].usDist);  // push to EEPROM + stream to Overseer
+                    // TODO: send turn command to pilot over I2C
+
+                    #ifdef DEBUG
+                        Serial.print(F("Gap detected at sensor "));
+                        Serial.print(gap);
+                        Serial.println(F(" — aligns with beacon, turning"));
+                    #endif
+                }
+            }
+            break;
+        }
+
+        case AVOIDING:
+            direction(readings, count);  // PD correction → I2C → pilot
+            break;
+    }
+
+    // Stream telemetry to Overseer every 500ms
+    streamTelemetry(currentState, readings, count, beaconHeading);
+
+    // Check for parameter updates from Overseer
+    checkOverseerCommands();
+
+    #ifdef DEBUG
+        Serial.print(F("State: "));
+        Serial.println(currentState == TRACKING ? "TRACKING" : "AVOIDING");
+    #endif
 }
