@@ -23,10 +23,6 @@
 // How often to send a full telemetry snapshot (ms)
 const unsigned long TELEMETRY_INTERVAL_MS = 500;
 
-// Tunable PD parameters — Overseer can update these at runtime
-int overseerKp = 3;
-int overseerKd = 1;
-
 // ─── Send Helpers ────────────────────────────────────────────────────────────
 
 void sendState(CarState state)
@@ -110,6 +106,71 @@ void checkOverseerCommands()
                     overseerKd = atoi(rxBuf + 3);
                     Serial.print(F("Overseer updated Kd: "));
                     Serial.println(overseerKd);
+                }
+                // Parse BIAS,<b0>,<b1>,<b2>,<b3>,<b4>,<b5>,<conf>
+                // conf (0–100) drives blend vs hard-set:
+                //   conf >= 70 → hard-set (Overseer is confident, apply directly)
+                //   conf <  70 → blend: new = (old * 2 + overseer) / 3  (conservative)
+                else if (strncmp(rxBuf, "BIAS,", 5) == 0)
+                {
+                    char* p = rxBuf + 5;
+                    int vals[6] = {0};
+                    int count = 0;
+                    while (p != nullptr && count < 6)
+                    {
+                        vals[count++] = atoi(p);
+                        p = strchr(p, ',');
+                        if (p) p++;
+                    }
+                    // Read optional confidence (7th field)
+                    uint8_t conf = 100;
+                    if (p != nullptr) conf = (uint8_t)atoi(p);
+
+                    for (int i = 0; i < count && i < 6; i++)
+                    {
+                        int v = vals[i];
+                        if (v < 1 || v > 5) continue;
+                        if (conf >= 70)
+                        {
+                            // High confidence — apply directly
+                            Sensors[i].bias = (uint8_t)v;
+                        }
+                        else
+                        {
+                            // Low confidence — blend toward Overseer value conservatively
+                            int blended = ((int)Sensors[i].bias * 2 + v + 1) / 3;
+                            Sensors[i].bias = (uint8_t)constrain(blended, 1, 5);
+                        }
+                    }
+                    #ifdef DEBUG
+                        Serial.print(F("Overseer biases (conf="));
+                        Serial.print(conf);
+                        Serial.println(')');
+                    #endif
+                }
+                // Parse BIAS_DELTA,<idx>,<delta>
+                // Single-sensor emergency update — apply immediately, no blending.
+                else if (strncmp(rxBuf, "BIAS_DELTA,", 11) == 0)
+                {
+                    char* p = rxBuf + 11;
+                    int idx = atoi(p);
+                    p = strchr(p, ',');
+                    if (p != nullptr)
+                    {
+                        p++;
+                        int delta = atoi(p);
+                        if (idx >= 0 && idx < 6)
+                        {
+                            int newBias = constrain((int)Sensors[idx].bias + delta, 1, 5);
+                            Sensors[idx].bias = (uint8_t)newBias;
+                            #ifdef DEBUG
+                                Serial.print(F("Bias delta sensor "));
+                                Serial.print(idx);
+                                Serial.print(' ');
+                                Serial.println(delta > 0 ? F("+1") : F("-1"));
+                            #endif
+                        }
+                    }
                 }
 
                 rxLen = 0;

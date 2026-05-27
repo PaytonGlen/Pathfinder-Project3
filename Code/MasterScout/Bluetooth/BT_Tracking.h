@@ -6,16 +6,15 @@
 #define BT_TRACKING_H
 
 #include <Arduino.h>
-#include <Servo.h>
 #include "HM10.h"
+#include <Functions.h>   // sendArmAngle() and CMD_ARM live here
 
 // ─── Arm Constants ───────────────────────────────────────────────────────────
-// TODO: assign servo pin on the Mega and wire arm to Scout Arduino
+// Angles sent to Pilot over I2C — Pilot drives the physical servo.
 
-const int ARM_PIN        = 44;   // TODO: update to actual Mega pin
-const int ARM_LEFT       = 110;  // max left angle (degrees)
-const int ARM_RIGHT      = 0;    // max right angle (degrees)
-const int ARM_CENTER     = 55;   // forward-facing center
+const int ARM_LEFT       = 110;  // max left angle  — matches Pilot PAN_LEFT
+const int ARM_RIGHT      = 0;    // max right angle — matches Pilot PAN_RIGHT
+const int ARM_CENTER     = 50;   // forward-facing  — matches Pilot PAN_CENTER (calibrated)
 const int ARM_STEP_DEG   = 10;   // degrees per sweep increment
 
 // ─── HM-10 Serial Ports ──────────────────────────────────────────────────────
@@ -30,24 +29,16 @@ const unsigned int LIGHT_STEP_MS = 120;  // ms between steps — must be >= serv
 
 // ─── State ───────────────────────────────────────────────────────────────────
 
-static Servo scanArm;
 int beaconHeading = ARM_CENTER;  // last known beacon direction — updated by searches
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
-
-void initScanArm()
-{
-    scanArm.attach(ARM_PIN);
-    scanArm.write(ARM_CENTER);
-    delay(400);  // let arm settle before first sweep
-}
 
 // Moves arm to angle, waits for it to settle, then samples RSSI from both modules.
 // Returns combined signal strength (sum of both RSSI values — less negative = stronger).
 int sampleAt(int angle)
 {
-    scanArm.write(angle);
-    delay(DEEP_STEP_MS);  // wait for physical movement + RSSI settle
+    sendArmAngle(angle);          // Scout sends angle to Pilot over I2C
+    delay(DEEP_STEP_MS);          // wait for physical movement + RSSI settle
 
     int rssiLeft  = queryRSSI(Serial1);
     int rssiRight = queryRSSI(Serial2);
@@ -89,7 +80,7 @@ void Deep_Search()
     }
 
     beaconHeading = bestAngle;
-    scanArm.write(beaconHeading);  // leave arm pointing at beacon
+    sendArmAngle(beaconHeading);   // leave arm pointing at beacon
 
     #ifdef DEBUG
         Serial.print(F("Deep_Search heading: "));
@@ -132,7 +123,7 @@ void Light_Search()
 
     // Move arm to next position for next call to sample
     currentAngle += stepDir;
-    scanArm.write(currentAngle);
+    sendArmAngle(currentAngle);
 
     // Reverse at limits — update heading at end of each sweep
     if (currentAngle >= ARM_LEFT)

@@ -28,9 +28,13 @@ int derivative(int firstScan, int secondScan)
 
 int PD_Loop(int firstScan, int secondScan)
 {
-    const int targetDist = 13;   // desired distance from wall in cm — tune on hardware
-    const int Kp         = 3;   // proportional gain — tune on hardware
-    const int Kd         = 1;   // derivative gain   — tune on hardware
+    const int targetDist  = 13;  // desired distance from wall in cm — tune on hardware
+    const int DEFAULT_KP  = 3;   // proportional gain fallback
+    const int DEFAULT_KD  = 1;   // derivative gain fallback
+
+    // Use Overseer-supplied gains if they have been received (-1 = not yet sent)
+    int Kp = (overseerKp >= 0) ? overseerKp : DEFAULT_KP;
+    int Kd = (overseerKd >= 0) ? overseerKd : DEFAULT_KD;
 
     int error      = firstScan - targetDist;
     int d          = derivative(firstScan, secondScan);

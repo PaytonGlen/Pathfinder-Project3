@@ -15,10 +15,9 @@ void setup()
     Serial.begin(9600);
     Serial1.begin(9600);  // HM-10 left module
     Serial2.begin(9600);  // HM-10 right module
-    Serial3.begin(9600);  // Overseer link (task 8)
+    Serial3.begin(115200);  // Overseer link
 
     Wire.begin();         // scout is I2C master
-    initScanArm();        // attach servo, center arm
 
     clearTurnLog();       // fresh run — reset EEPROM stack and notify Overseer
     Deep_Search();        // get initial beacon heading before moving
@@ -60,12 +59,12 @@ void loop()
                     // Gap aligns with beacon — confirm heading then commit to turn
                     Deep_Search();
                     logTurn(gap, readings[gap].usDist);  // push to EEPROM + stream to Overseer
-                    // TODO: send turn command to pilot over I2C
+                    sendTurn(gapOnRight);                 // CMD_TURN → Pilot executes pivot
 
                     #ifdef DEBUG
                         Serial.print(F("Gap detected at sensor "));
                         Serial.print(gap);
-                        Serial.println(F(" — aligns with beacon, turning"));
+                        Serial.println(gapOnRight ? F(" — turning right") : F(" — turning left"));
                     #endif
                 }
             }

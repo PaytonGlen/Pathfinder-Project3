@@ -161,7 +161,8 @@ void direction(ScanResult readings[], int count)
                 highestBias  = readings[i].bias;
                 highestIndex = i;
             }
-            else if (readings[i].bias == highestBias &&
+            else if (highestIndex != -1 &&
+                     readings[i].bias == highestBias &&
                      readings[i].usDist < readings[highestIndex].usDist)
             {
                 highestIndex = i;
@@ -173,8 +174,9 @@ void direction(ScanResult readings[], int count)
     {
         Motor_Speeds speeds = objectDetected(highestIndex, readings[highestIndex]);
 
-        // Send left and right motor speeds to the pilot over I2C (2 bytes)
+        // Send motor speeds to pilot over I2C
         Wire.beginTransmission(PILOT_I2C_ADDRESS);
+        Wire.write(CMD_MOTORS);
         Wire.write(speeds.LEFT_DRIVE_SPEED);
         Wire.write(speeds.RIGHT_DRIVE_SPEED);
         Wire.endTransmission();

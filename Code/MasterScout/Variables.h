@@ -1,9 +1,12 @@
 
+#ifndef VARIABLES_H
+#define VARIABLES_H
+
 unsigned short LEFT_MOTOR_SPEED;
 unsigned short RIGHT_MOTOR_SPEED;
 
-const int STOP_DISTANCE_CM     = 20;
-const int CLEAR_DISTANCE_CM    = 30;
+const int STOP_DISTANCE_CM      = 20;
+const int CLEAR_DISTANCE_CM     = 30;
 const int IR_OBSTACLE_THRESHOLD = 125;
 
 // Schmitt trigger thresholds for blocked state hysteresis.
@@ -16,7 +19,15 @@ const int SCHMITT_CLEAR_CM = 20;  // ~8 inches — clears blocked = false
 // GAP_THRESHOLD_CM is the minimum jump in distance to count as a real opening.
 const int GAP_THRESHOLD_CM = 25;  // tune on hardware — too low = false gaps, too high = missed gaps
 
+// ─── Overseer-tunable PD gains ───────────────────────────────────────────────
+// -1 = Overseer has not sent a value yet — PD_Loop falls back to its local defaults.
+// Set by checkOverseerCommands() in OverseerLink.h when KP/KD packets arrive.
+int overseerKp = -1;
+int overseerKd = -1;
+
 // ─── State Machine ───────────────────────────────────────────────────────────
 // TRACKING  = no obstacle, driving toward beacon, Light_Search() running
 // AVOIDING  = obstacle within SCHMITT_BLOCK_CM, PD correction active
 enum CarState { TRACKING, AVOIDING };
+
+#endif
