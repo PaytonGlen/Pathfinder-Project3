@@ -23,19 +23,47 @@ struct SensorDirection
     uint8_t     bias;   // priority weight: higher = more important direction
 };
 
+
+
 struct ScanResult
 {
     int     usDist;      // ultrasonic distance in cm (0 = timeout / out of range)
     int     irRaw;       // raw IR analogRead value (0–1023, higher = closer)
     bool    blocked;     // true if BOTH sensors confirm obstacle (Schmitt trigger)
-    bool    gapDetected; // true if sensor was blocked last scan and distance jumped significantly
+    bool    gapDetected; // true if sensor was blocked last scan and distance jumped a lot
     int     prevDist;    // usDist from previous scan — used for PD derivative + gap detection
     uint8_t echoPin;
     uint8_t trigPin;
     uint8_t bias;
 };
 
-// ─── Sensor Array ────────────────────────────────────────────────────────────
+/*
+Each instance of sensor directions have these properties. I put them into a struct
+
+STRUCT SensorDirection 1 o clock:
+    STRUCT ScanResult:
+            usDist;      // ultrasonic distance in cm (0 = timeout / out of range)
+            irRaw;       // raw IR analogRead value (0–1023, higher = closer)
+            blocked;     // true if BOTH sensors confirm obstacle (Schmitt trigger)
+            gapDetected; // true if sensor was blocked last scan and distance jumped a lot
+            prevDist;    // usDist from previous scan — used for PD derivative + gap detection
+            echoPin;
+            trigPin;
+            bias;
+
+STRUCT SensorDirection 2 o clock"
+        ScanResult:
+            usDist;      // ultrasonic distance in cm (0 = timeout / out of range)
+            irRaw;       // raw IR analogRead value (0–1023, higher = closer)
+            blocked;     // true if BOTH sensors confirm obstacle (Schmitt trigger)
+            gapDetected; // true if sensor was blocked last scan and distance jumped a lot
+            prevDist;    // usDist from previous scan — used for PD derivative + gap detection
+            echoPin;
+            trigPin;
+            bias;
+*/
+
+// ─── Sensor Array 
 
 SensorDirection Sensors[6] =
 {
@@ -50,12 +78,12 @@ SensorDirection Sensors[6] =
 // Global scan result array — declared here so prevDist persists between loop() iterations
 ScanResult readings[6];
 
-// ─── Forward Declarations ────────────────────────────────────────────────────
+// Prototype
 
 Motor_Speeds objectDetected(uint8_t direction, ScanResult& reading);
 void         ScanAll(SensorDirection sensors[], ScanResult readings[], int count);
 
-// ─── Functions ───────────────────────────────────────────────────────────────
+// Functions
 
 // Reads one sensor pair and returns a populated ScanResult.
 // prev is the result from the last scan — used to carry prevDist forward.
@@ -65,15 +93,12 @@ ScanResult SensorDetect(SensorDirection& s, ScanResult& prev)
 
     r.prevDist = prev.usDist;
     r.usDist   = readDistanceCm(s.trigPin, s.echoPin);
-    r.irRaw    = analogRead(s.irPin);
+    // removed irRaw.   Later will add the ToF light sensor in its place. IR is too inaccurate when in light
     r.echoPin  = s.echoPin;
     r.trigPin  = s.trigPin;
     r.bias     = s.bias;
 
-    // Schmitt trigger — hysteresis prevents rapid toggling at the edge of detection range.
-    // If already blocked: stay blocked until usDist rises above SCHMITT_CLEAR_CM.
-    // If not blocked:     only trigger if usDist drops below SCHMITT_BLOCK_CM.
-    // IR must also confirm in both cases to reduce false positives.
+    // Schmitt trigger — No more IR Sensors
     bool irBlocked = (r.irRaw > IR_OBSTACLE_THRESHOLD);
     bool usValid   = (r.usDist > 0);  // 0 = sensor timeout / out of range
 

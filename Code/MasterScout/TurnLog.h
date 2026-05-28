@@ -1,17 +1,3 @@
-// Ring-buffer turn log stored in Scout EEPROM.
-// Each entry records the sensor index and distance at time of turn.
-// Entries can be popped newest-first to retrace the route in reverse.
-// Also streams each entry to the Overseer via Serial3 for SD logging.
-//
-// Layout:
-//   Bytes 0–1  count  — number of valid entries (0 to MAX_ENTRIES)
-//   Bytes 2–3  head   — index of the oldest entry (0 to MAX_ENTRIES-1)
-//   Bytes 4+   entries — ring slots, each ENTRY_SIZE bytes
-//
-// When the buffer is full, logTurn() overwrites the oldest slot (at head)
-// and advances head, so the log always holds the most recent MAX_ENTRIES turns.
-// popTurn() removes from the newest end (head + count - 1), preserving order.
-
 #ifndef TURN_LOG_H
 #define TURN_LOG_H
 

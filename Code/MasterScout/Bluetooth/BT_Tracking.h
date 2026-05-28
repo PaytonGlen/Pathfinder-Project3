@@ -33,32 +33,26 @@ int beaconHeading = ARM_CENTER;  // last known beacon direction — updated by s
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-// Moves arm to angle, waits for it to settle, then samples RSSI from both modules.
-// Returns combined signal strength (sum of both RSSI values — less negative = stronger).
+
 int sampleAt(int angle)
 {
     sendArmAngle(angle);          // Scout sends angle to Pilot over I2C
     delay(DEEP_STEP_MS);          // wait for physical movement + RSSI settle
 
-    int rssiLeft  = queryRSSI(Serial1);
-    int rssiRight = queryRSSI(Serial2);
+    int rssiQuery  = queryRSSI(Serial1);
 
     // Both return 0 on timeout — treat 0 as very weak signal
-    if (rssiLeft  == 0) rssiLeft  = -100;
-    if (rssiRight == 0) rssiRight = -100;
+    if (rssiQuery  == 0) rssiQuery  = -100;
 
-    return rssiLeft + rssiRight;  // higher (less negative) = beacon is in this direction
-}
+    return rssiQuery; 
+} 
 
-// ─── Deep_Search ─────────────────────────────────────────────────────────────
-// Blocking. Sweeps arm slowly left and right DEEP_SWEEPS times.
-// Finds the angle with the strongest combined RSSI and stores it as beaconHeading.
-// Call on startup or when beacon is lost.
-
-void Deep_Search()
+void Deep_Search(SensorDirection sensors[], ScanResult readings[], int count)
 {
     int bestAngle  = ARM_CENTER;
     int bestSignal = -9999;
+
+    ScanAll(sensors, readings, count);
 
     for (int sweep = 0; sweep < DEEP_SWEEPS; sweep++)
     {
@@ -90,12 +84,6 @@ void Deep_Search()
     #endif
 }
 
-// ─── Light_Search ────────────────────────────────────────────────────────────
-// Non-blocking. Call every loop() iteration while TRACKING.
-// Advances the arm one step per LIGHT_STEP_MS using millis() — no delay().
-// The millis() gap doubles as servo settle time from the previous step.
-// Updates beaconHeading at the end of each sweep pass.
-
 void Light_Search()
 {
     static int           currentAngle = ARM_CENTER;
@@ -105,13 +93,12 @@ void Light_Search()
     static int           bestAngle    = ARM_CENTER;
 
     unsigned long now = millis();
-    if (now - lastStep < LIGHT_STEP_MS) return;  // not time yet — yield immediately
+    if (now - lastStep < LIGHT_STEP_MS) return;  
     lastStep = now;
 
-    // Sample RSSI at current position (servo settled since last call)
     int rssiLeft  = queryRSSI(Serial1);
     int rssiRight = queryRSSI(Serial2);
-    if (rssiLeft  == 0) rssiLeft  = -100;   // timeout = treat as very weak
+    if (rssiLeft  == 0) rssiLeft  = -100;
     if (rssiRight == 0) rssiRight = -100;
 
     int signal = rssiLeft + rssiRight;
@@ -121,7 +108,7 @@ void Light_Search()
         bestAngle  = currentAngle;
     }
 
-    // Move arm to next position for next call to sample
+   
     currentAngle += stepDir;
     sendArmAngle(currentAngle);
 
