@@ -25,6 +25,13 @@
 //       Single-sensor emergency update. Applied immediately, no blending.
 //       delta is typically +1 or -1.
 
+
+/*
+This file was created with Claude AI.
+The purpose of this file is to log data and send that data to the Analyst Grand Central M4 for tuning adjustments
+It's sole purpose is to serve as a link between this controller and the other one
+*/
+
 #ifndef OVERSEER_LINK_H
 #define OVERSEER_LINK_H
 

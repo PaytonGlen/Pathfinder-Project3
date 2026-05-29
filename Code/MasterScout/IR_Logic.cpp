@@ -1,4 +1,0 @@
-/*
-    This will be where the IR Sensor logic lives.
-    Create a function 
-*/

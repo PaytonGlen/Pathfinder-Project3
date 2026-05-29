@@ -1,4 +1,7 @@
-// The purpose of this code is to calculate motor speeds based on object detection (distances)
+/*
+    The purpose of this code is to hold the functions used to perform calculations necessary for adjusting motor speeds.
+    It holds functions like derivative() and PD_Loops()
+*/
 #include <Arduino.h>
 
 // Uncomment to enable serial debug output

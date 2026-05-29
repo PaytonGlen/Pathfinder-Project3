@@ -1,3 +1,7 @@
+/*
+    This is the main program. Upload this program into the arduino to get it functioning
+*/
+
 #include <Wire.h>
 #include <Pins.h>
 #include <Variables.h>
@@ -14,13 +18,13 @@ void setup()
 {
     Serial.begin(9600);
     Serial1.begin(9600);  // HM-10 left module
-    Serial2.begin(9600);  // HM-10 right module
-    Serial3.begin(115200);  // Overseer link
+    Serial2.begin(115200);  // Overseer link
 
     Wire.begin();         // scout is I2C master
 
     clearTurnLog();       // fresh run — reset EEPROM stack and notify Overseer
-    Deep_Search();        // get initial beacon heading before moving
+    Deep_Search();        // get initial beacon heading before moving. 
+                          // This function also gets the sensor readings
 
     Serial.println(F("Scout ready"));
 }

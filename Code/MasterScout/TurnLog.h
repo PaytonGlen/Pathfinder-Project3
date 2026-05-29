@@ -1,3 +1,11 @@
+/*
+The purpose of this file is to log each turn the car makes so the route can be retraced later.
+Each turn is stored in EEPROM and also streamed to the Overseer/Analyst Arduino as well
+
+This file may not be necessary
+*/
+
+
 #ifndef TURN_LOG_H
 #define TURN_LOG_H
 
@@ -82,7 +90,7 @@ bool popTurn(TurnEntry& out)
 
     EEPROM.get(RING_BASE + newest * ENTRY_SIZE, out);
     setCount(count - 1);
-    // head does not move — we removed from the newest end
+    // head does not move 
 
     #ifdef DEBUG
         Serial.print(F("TurnLog pop: slot="));

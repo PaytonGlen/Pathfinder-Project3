@@ -1,3 +1,8 @@
+/*
+The purpose of this file is a central location for all of the sensor scan logic. 
+The code here directly relates to the navigation of the car and the processing of data from the on-board sensors
+*/
+
 #include <Pins.h>
 #include <NetworkVars.h>
 #include <IrSensor.h>

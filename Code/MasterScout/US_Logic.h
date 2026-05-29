@@ -1,5 +1,5 @@
 /* 
-    This will be where the code that processes the ultrasonic sensor logic lives.
+    The purpose of this file is to serve as a location for the utility functions used for the Ultrasonic sensors live
 */
 
 #include <IrSensor.h>

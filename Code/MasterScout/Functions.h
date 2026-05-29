@@ -1,3 +1,10 @@
+/*
+The purpose of this file is to serve as a location for generic utility functions that can be used throughought the project.
+Some functions like scale(), would be useful in more than one location so it would live in this file.
+
+This file also hold I2C, and driving functions
+*/
+
 #include <Wire.h>
 
 // ─── I2C Command Bytes ───────────────────────────────────────────────────────
@@ -72,4 +79,9 @@ int scale(int value, float sensitivity)
 {
     float scaled = sensitivity * value * value;
     return (value >= 0 ? 1 : -1) * round(scaled);
+}
+
+void Deep_Search()
+{
+    ScanAll(Sensors, readings, 6);
 }
