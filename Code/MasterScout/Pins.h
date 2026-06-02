@@ -9,23 +9,23 @@ typedef uint8_t byte;
 // Echo pins are even #
 // Trigger pins are odd #
 
-const byte US_Sensor1_Echo_Pin = 6;
-const byte US_Sensor1_Trig_Pin = 7;
+// #0 is there 12 pm one. (exists on the pilot)
 
-const byte US_Sensor2_Echo_Pin = 4;
-const byte US_Sensor2_Trig_Pin = 5;
+// #1 -- 1pm direction
+const byte US_Sensor1_Echo_Pin = 32
+const byte US_Sensor1_Trig_Pin = 33;
 
-const byte US_Sensor3_Echo_Pin = 2;
-const byte US_Sensor3_Trig_Pin = 3;
+// #2 -- 3pm direction
+const byte US_Sensor2_Echo_Pin = 26;
+const byte US_Sensor2_Trig_Pin = 27;
 
-const byte US_Sensor4_Echo_Pin = 12;
-const byte US_Sensor4_Trig_Pin = 13;
+// #3 -- 9pm direction
+const byte US_Sensor3_Echo_Pin = 51;
+const byte US_Sensor3_Trig_Pin = 53;
 
-const byte US_Sensor5_Echo_Pin = 10;
-const byte US_Sensor5_Trig_Pin = 11;
-
-const byte US_Sensor6_Echo_Pin = 8;
-const byte US_Sensor6_Trig_Pin = 9;
+// #4 -- 11pm direction
+const byte US_Sensor4_Echo_Pin = 50;
+const byte US_Sensor4_Trig_Pin = 52;
 
 // These no longer exist. will be the ToF light sensors.
 /*

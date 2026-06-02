@@ -17,8 +17,10 @@ CarState currentState = TRACKING;  // start in TRACKING mode
 void setup()
 {
     Serial.begin(9600);
-    Serial1.begin(9600);  // HM-10 left module
-    Serial2.begin(115200);  // Overseer link
+    
+    // No bluetooth yet
+    // Serial1.begin(9600);  // HM-10 left module
+    // Serial2.begin(115200);  // Overseer link
 
     Wire.begin();         // scout is I2C master
 
@@ -80,12 +82,13 @@ void loop()
             break;
     }
 
+    // ----------------------------------------------- No Analyst controller yet -----------------------------------------------
     // Stream telemetry to Overseer every 500ms
-    streamTelemetry(currentState, readings, count, beaconHeading);
+    // streamTelemetry(currentState, readings, count, beaconHeading);
 
     // Check for parameter updates from Overseer
-    checkOverseerCommands();
-
+    // checkOverseerCommands();
+    // ---------------------------------------------------------------------------------------------------------------------------------------------
     #ifdef DEBUG
         Serial.print(F("State: "));
         Serial.println(currentState == TRACKING ? "TRACKING" : "AVOIDING");
