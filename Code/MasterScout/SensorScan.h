@@ -35,7 +35,7 @@ struct ScanResult
     int     usDist;      // ultrasonic distance in cm (0 = timeout / out of range)
     int     irRaw;       // raw IR analogRead value (0–1023, higher = closer)
     bool    blocked;     // true if BOTH sensors confirm obstacle (Schmitt trigger)
-    bool    gapDetected; // true if sensor was blocked last scan and distance jumped a lot
+    // bool    gapDetected; // true if sensor was blocked last scan and distance jumped a lot
     int     prevDist;    // usDist from previous scan — used for PD derivative + gap detection
     uint8_t echoPin;
     uint8_t trigPin;
@@ -114,8 +114,8 @@ ScanResult SensorDetect(SensorDirection& s, ScanResult& prev)
 
     // Gap detection — sensor was blocked last scan but distance jumped significantly.
     // Indicates the car has passed the edge of a wall and an opening is present.
-    bool wasBlocked   = prev.blocked;
-    bool distJumped   = usValid && (r.usDist - r.prevDist) > GAP_THRESHOLD_CM;
+    // bool wasBlocked   = prev.blocked;
+    // bool distJumped   = usValid && (r.usDist - r.prevDist) > GAP_THRESHOLD_CM;
     r.gapDetected     = wasBlocked && !r.blocked && distJumped;
 
     #ifdef DEBUG
