@@ -30,9 +30,9 @@ const uint8_t       BASE_SPEED_R     = 102;
 const int           SCHMITT_BLOCK_CM = 18;   // triggers blocked when dist drops below this
 const int           SCHMITT_CLEAR_CM = 21;   // clears blocked when dist rises above this
 const int           PD_TARGET_CM     = 13;   // desired following distance
-const int           DEFAULT_KP       = 6;
-const int           DEFAULT_KD       = 2;
-const unsigned long ECHO_TIMEOUT_US  = 6000; // ~5m max range
+const int           DEFAULT_KP       = 12;
+const int           DEFAULT_KD       = 6;
+const unsigned long ECHO_TIMEOUT_US  = 6000;
 
 // ─── Data structures ──────────────────────────────────────────────────────────
 
@@ -98,29 +98,20 @@ void scanOne(int i)
     {
         if (blockCondition)
         {
-            r.blockHits++;
-            if (r.blockHits >= BLOCK_CONFIRM)
+            // returns true if us sensor is triggered for 50 millis
+            if (r.blockHits)
             {
                 r.blocked = true;
-                r.blockHits = 0;
-                r.clearHits = 0;
             }
-        }
-        else
-        {
-            r.blockHits = 0;
         }
     }
     else
     {
         if (clearCondition)
         {
-            r.clearHits++;
             if (r.clearHits >= CLEAR_CONFIRM)
             {
                 r.blocked = false;
-                r.blockHits = 0;
-                r.clearHits = 0;
             }
         }
         else
@@ -160,9 +151,12 @@ int PD_Loop(int current, int previous)
     int derivative = delta(previous, current);
     int correction = (DEFAULT_KP * error) + (DEFAULT_KD * derivative);
 
-    Serial.print(F("[PD]    error="));   Serial.print(error);
-    Serial.print(F("  deriv="));         Serial.print(derivative);
-    Serial.print(F("  correction="));    Serial.println(correction);
+    // Serial.print(F("[PD]    error="));   
+    // Serial.print(error);
+    // Serial.print(F("  deriv="));         
+    // Serial.print(derivative);
+    // Serial.print(F("  correction="));    
+    // Serial.println(correction);
 
     return correction;
 }
@@ -206,8 +200,8 @@ void i2cSendMotors(uint8_t ld, uint8_t ls, uint8_t rd, uint8_t rs)
 
 void driveForward()
 {
-    Serial.print(F("[MTR]   L=")); Serial.print(BASE_SPEED_L);
-    Serial.print(F("  R="));      Serial.println(BASE_SPEED_R);
+    // Serial.print(F("[MTR]   L=")); Serial.print(BASE_SPEED_L);
+    // Serial.print(F("  R="));      Serial.println(BASE_SPEED_R);
     i2cSendMotors(0, BASE_SPEED_L, 0, BASE_SPEED_R);
 }
 
@@ -232,9 +226,9 @@ void avoidObstacle()
 
     if (highIdx == -1) return;
 
-    Serial.print(F("[STATE] AVOIDING | ")); Serial.print(sensors[highIdx].label);
-    Serial.print(F("  dist="));            Serial.print(readings[highIdx].usDist);
-    Serial.println(F("cm"));
+    // Serial.print(F("[STATE] AVOIDING | ")); Serial.print(sensors[highIdx].label);
+    // Serial.print(F("  dist="));            Serial.print(readings[highIdx].usDist);
+    // Serial.println(F("cm"));
 
     int correction = PD_Loop(readings[highIdx].usDist, readings[highIdx].prevDist);
 
@@ -252,8 +246,8 @@ void avoidObstacle()
         r = (uint8_t)constrain(BASE_SPEED_R - correction, 0, 255);
     }
 
-    Serial.print(F("[MTR]   L=")); Serial.print(l);
-    Serial.print(F("  R="));      Serial.println(r);
+    // Serial.print(F("[MTR]   L=")); Serial.print(l);
+    // Serial.print(F("  R="));      Serial.println(r);
 
     i2cSendMotors(0, l, 0, r);
 }
@@ -274,6 +268,7 @@ void setup()
 
     memset(readings, 0, sizeof(readings));
 
+/*
     Serial.println(F("=== ScoutPDTest ready ==="));
     Serial.print(F("Kp="));     Serial.print(DEFAULT_KP);
     Serial.print(F("  Kd="));   Serial.print(DEFAULT_KD);
@@ -282,6 +277,7 @@ void setup()
     Serial.print(F("cm  clear>")); Serial.print(SCHMITT_CLEAR_CM);
     Serial.println(F("cm"));
     Serial.println();
+    */
 }
 
 // ─── Loop ─────────────────────────────────────────────────────────────────────
@@ -291,27 +287,29 @@ void loop()
     // 1. Scan
     scanAll();
 
+    /*
     // 2. Sensor readings
     Serial.print(F("[SENS]  1pm="));  Serial.print(readings[0].usDist);
     Serial.print(F("cm  3pm="));      Serial.print(readings[1].usDist);
     Serial.print(F("cm  9pm="));      Serial.print(readings[2].usDist);
     Serial.print(F("cm  11pm="));     Serial.print(readings[3].usDist);
     Serial.println(F("cm"));
+    */
 
     // 3. Blocked summary
-    Serial.print(F("[BLKD]  "));
+    // Serial.print(F("[BLKD]  "));
     bool anyBlock = false;
     for (int i = 0; i < SENSOR_COUNT; i++)
     {
         if (readings[i].blocked)
         {
-            Serial.print(sensors[i].label);
-            Serial.print(F("  "));
+            // Serial.print(sensors[i].label);
+            // Serial.print(F("  "));
             anyBlock = true;
         }
     }
-    if (!anyBlock) Serial.print(F("clear"));
-    Serial.println();
+    // if (!anyBlock) Serial.print(F("clear"));
+    // Serial.println();
 
     // 4. State + act
     currentState = anyBlocked() ? AVOIDING : TRACKING;
@@ -319,7 +317,7 @@ void loop()
     switch (currentState)
     {
         case TRACKING:
-            Serial.println(F("[STATE] TRACKING"));
+            // Serial.println(F("[STATE] TRACKING"));
             driveForward();
             break;
         case AVOIDING:
@@ -327,5 +325,5 @@ void loop()
             break;
     }
 
-    Serial.println(F("────────────────────────────"));
+    // Serial.println(F("────────────────────────────"));
 }
