@@ -1,5 +1,6 @@
 
 #include <Wire.h>
+#include "Sensors/Mpu6050.h"   // initMpu(), readMpu() — beacon-direction turn uses gyro Z
 
 // ─── Pins ─────────────────────────────────────────────────────────────────────
 
@@ -22,6 +23,11 @@ const uint8_t CLEAR_CONFIRM = 2;
 
 const uint8_t PILOT_ADDR = 0x08;
 const uint8_t CMD_MOTORS = 0x01;
+const uint8_t CMD_ARM    = 0x02;   // (handled by Pilot; not used directly here yet)
+const uint8_t CMD_TURN   = 0x03;   // dir byte: 0=right, 1=left
+const uint8_t CMD_SWEEP  = 0x04;   // tell Pilot to run the BLE beacon sweep
+
+int MILLIS_TIMER = 5;
 
 // ─── Tuning ───────────────────────────────────────────────────────────────────
 
@@ -34,7 +40,21 @@ const int           DEFAULT_KP       = 12;
 const int           DEFAULT_KD       = 6;
 const unsigned long ECHO_TIMEOUT_US  = 6000;
 
+// ─── Beacon localization / MPU turn ──────────────────────────────────────────
+
+const unsigned long LOCALIZE_TIMEOUT_MS    = 30000;  // if Pilot never returns "done", give up
+const unsigned long POLL_INTERVAL_MS       = 250;    // how often to ask Pilot for sweep status
+const uint8_t       VERIFY_PEAK_TOL_DEG    = 25;     // verify pass: ±25° of center is OK
+const float         GYRO_LSB_PER_DPS       = 131.0f; // MPU6050 default ±250 dps full-scale
+const unsigned long MPU_CALIB_SAMPLES      = 200;
+const unsigned long MPU_SAMPLE_DELAY_MS    = 2;
+// If calibration shows the ESP32-upside-down mount mirrors angle → RSSI,
+// flip this to true to negate the turn delta.
+const bool          MIRROR_BEACON_ANGLE    = false;
+
 // ─── Data structures ──────────────────────────────────────────────────────────
+
+const int TILT_LEVEL = 160;   // calibrated: arm horizontal
 
 struct SensorConfig
 {
@@ -46,12 +66,14 @@ struct SensorConfig
 
 struct ScanResult
 {
-    int  usDist;
-    int  prevDist;
-    bool blocked;
+    int           usDist;
+    int           prevDist;
+    bool          blocked;
+    unsigned long blockSince;   // ms at which dist first dropped below BLOCK; 0 = not below
 };
 
 enum CarState { TRACKING, AVOIDING };
+enum Phase    { LOCALIZING, TURNING, VERIFYING, DRIVING };
 
 // ─── Sensor table ─────────────────────────────────────────────────────────────
 
@@ -67,6 +89,16 @@ SensorConfig sensors[SENSOR_COUNT] = {
 ScanResult readings[SENSOR_COUNT];
 CarState   currentState = TRACKING;
 
+// Phase machine state
+Phase          currentPhase    = LOCALIZING;
+unsigned long  phaseStartMs    = 0;
+unsigned long  lastPollMs      = 0;
+int            bestBeaconAngle = 90;     // 90 = straight ahead; updated when sweep returns
+int8_t         lastRssi        = -127;
+
+// MPU yaw state
+float          gyroZOffset     = 0.0f;
+
 // ─── Ultrasonic ───────────────────────────────────────────────────────────────
 
 int readDistanceCm(uint8_t trig, uint8_t echo)
@@ -79,7 +111,79 @@ int readDistanceCm(uint8_t trig, uint8_t echo)
     return (int)(pulse / 58UL);
 }
 
+
+
+// Per-sensor debounce. Returns true once the sensor has been continuously
+// below SCHMITT_BLOCK_CM for at least MILLIS_TIMER ms — gates the blocked flag
+// from flapping on transient echoes.
+bool CurrentTimePassed(int i)
+{
+    ScanResult& r = readings[i];
+    bool belowBlock = (r.usDist > 0) && (r.usDist < SCHMITT_BLOCK_CM);
+
+    if (belowBlock)
+    {
+        if (r.blockSince == 0) r.blockSince = millis();
+        return (millis() - r.blockSince) >= (unsigned long)MILLIS_TIMER;
+    }
+
+    r.blockSince = 0;
+    return false;
+}
+
 // ─── Scan ─────────────────────────────────────────────────────────────────────
+
+// usSensor reading -> 40
+// when reading < 60, the obstacle detected is true
+// obstacle detected = true
+// if obstacle detected = true for 3 seconds, then make blocked = true
+
+// if (obstacleDetected) && (millis - blockstart > 50)
+
+// unsigned long lastMotionTime = 0; // Stores time of most recent trigger
+// bool occupiedState = false;       // Tracks whether sensor is triggered
+// unsigned long currentTime = millis();     // Current time
+// lastMotionTime = currentTime; // Update last detected motion time
+/*
+
+- take reading
+- take currentTime
+
+- set State
+
+currentTime = millis;
+
+- if (State == HIGH)
+    {
+        lastMotionTime = currentTime;    
+
+        if (State && lastMotionTime - currentTime > 50)
+            {
+                blocked = true;
+            }
+    }
+
+   
+    x = CurrentTime();
+
+    if (x > 5 && condition)
+
+
+  if (buttonState == HIGH) {
+    lastMotionTime = currentTime; // Update last detected motion time
+
+    // Only switch to occupied once until timeout resets it
+    if (!occupiedState) {
+      occupiedState = true;
+
+      signServo.write(occupiedAngle); // Point to "occupied"
+
+      tone(buzzerPin, 1000); // Play warning tone
+      delay(500);            // Sound for 0.5 seconds
+      noTone(buzzerPin);     // Stop tone
+    }
+  }
+*/
 
 void scanOne(int i)
 {
@@ -91,33 +195,18 @@ void scanOne(int i)
 
     bool usValid = (r.usDist > 0);
 
-    bool blockCondition = usValid && (r.usDist < SCHMITT_BLOCK_CM);
-    bool clearCondition = !usValid || (r.usDist > SCHMITT_CLEAR_CM);
+    // Block: must be below BLOCK_CM and the debounce has elapsed (CurrentTimePassed).
+    bool blockCondition = usValid && r.usDist < SCHMITT_BLOCK_CM && CurrentTimePassed(i);
 
-    if (!r.blocked)
+    if (!r.blocked && blockCondition)
     {
-        if (blockCondition)
-        {
-            // returns true if us sensor is triggered for 50 millis
-            if (r.blockHits)
-            {
-                r.blocked = true;
-            }
-        }
+        r.blocked = true;
     }
-    else
+    // Clear: when above CLEAR_CM, reset blocked + debounce timer.
+    else if (r.blocked && usValid && r.usDist > SCHMITT_CLEAR_CM)
     {
-        if (clearCondition)
-        {
-            if (r.clearHits >= CLEAR_CONFIRM)
-            {
-                r.blocked = false;
-            }
-        }
-        else
-        {
-            r.clearHits = 0;
-        }
+        r.blocked    = false;
+        r.blockSince = 0;
     }
 }
 
@@ -126,7 +215,7 @@ void scanAll()
     for (int i = 0; i < SENSOR_COUNT; i++)
     {
         scanOne(i);
-        delay(20);  // let echo die before firing next sensor — prevents crosstalk
+        delay(20);  // let echo die before firing next sensor
     }
 }
 
@@ -193,6 +282,176 @@ void i2cSendMotors(uint8_t ld, uint8_t ls, uint8_t rd, uint8_t rs)
     Wire.write(rd); Wire.write(rs);
     uint8_t err = Wire.endTransmission();
     if (err != 0) { Serial.print(F("[I2C]   err=")); Serial.println(err); }
+}
+
+// Single-byte command (used for CMD_SWEEP).
+void i2cSendByte(uint8_t cmd)
+{
+    Wire.beginTransmission(PILOT_ADDR);
+    Wire.write(cmd);
+    Wire.endTransmission();
+}
+
+// CMD_TURN with direction byte (0=right, 1=left). Pilot holds the turn at
+// TURN_SPEED until next CMD_MOTORS arrives, which is why turnByDegrees() ends
+// with i2cSendStop().
+void i2cSendTurn(uint8_t dir)
+{
+    Wire.beginTransmission(PILOT_ADDR);
+    Wire.write(CMD_TURN);
+    Wire.write(dir);
+    Wire.endTransmission();
+}
+
+void i2cSendStop()
+{
+    i2cSendMotors(0, 0, 0, 0);
+}
+
+// Pulls sweep status from Pilot: [doneFlag, bestAngle, latestRssi].
+// Returns false on I²C short-read (no response, or Pilot's onRequest not set up).
+bool readSweepStatus(uint8_t &done, uint8_t &bestAngle, int8_t &rssi)
+{
+    uint8_t got = Wire.requestFrom((uint8_t)PILOT_ADDR, (uint8_t)3);
+    if (got < 3) return false;
+
+    done      = Wire.read();
+    bestAngle = Wire.read();
+    rssi      = (int8_t)Wire.read();
+    return true;
+}
+
+// ─── MPU helpers ──────────────────────────────────────────────────────────────
+
+// Sample gyro Z with the tank stationary for MPU_CALIB_SAMPLES to get the bias.
+// readYawRateDps() subtracts this so a stationary gyro reads ~0 dps.
+void calibrateMpu()
+{
+    long sum = 0;
+    for (unsigned long n = 0; n < MPU_CALIB_SAMPLES; n++)
+    {
+        short ax,ay,az,gx,gy,gz;
+        readMpu(ax,ay,az,gx,gy,gz);
+        sum += gz;
+        delay(MPU_SAMPLE_DELAY_MS);
+    }
+    gyroZOffset = (float)sum / (float)MPU_CALIB_SAMPLES;
+}
+
+float readYawRateDps()
+{
+    short ax,ay,az,gx,gy,gz;
+    readMpu(ax,ay,az,gx,gy,gz);
+    return ((float)gz - gyroZOffset) / GYRO_LSB_PER_DPS;
+}
+
+// Blocking turn by integrating gyro Z until |heading| reaches |deg|.
+// Positive deg = right turn (CMD_TURN dir=0), negative = left (dir=1).
+void turnByDegrees(int deg)
+{
+    if (deg == 0) return;
+
+    bool rightTurn = (deg > 0);
+    i2cSendTurn(rightTurn ? 0 : 1);
+
+    float target  = fabs((float)deg);
+    float heading = 0.0f;
+    unsigned long lastMs = millis();
+
+    while (fabs(heading) < target)
+    {
+        unsigned long now = millis();
+        float dt = (now - lastMs) / 1000.0f;
+        lastMs = now;
+        float dps = readYawRateDps();
+        heading += dps * dt;
+        delay(MPU_SAMPLE_DELAY_MS);
+    }
+
+    i2cSendStop();
+    Serial.print(F("[MPU]   turn done. heading=")); Serial.println(heading);
+}
+
+// ─── Phase handlers ──────────────────────────────────────────────────────────
+
+void handleLocalizing()
+{
+    if (millis() - phaseStartMs > LOCALIZE_TIMEOUT_MS)
+    {
+        Serial.println(F("[BEACON] Localize timeout — falling through to DRIVING"));
+        currentPhase = DRIVING;
+        phaseStartMs = millis();
+        return;
+    }
+
+    if (millis() - lastPollMs < POLL_INTERVAL_MS) return;
+    lastPollMs = millis();
+
+    uint8_t done = 0, ang = 90;
+    int8_t  rssi = -127;
+    if (!readSweepStatus(done, ang, rssi)) return;  // Pilot not ready yet
+
+    lastRssi = rssi;
+    if (done)
+    {
+        bestBeaconAngle = ang;
+        Serial.print(F("[BEACON] sweep done. bestAngle=")); Serial.print(bestBeaconAngle);
+        Serial.print(F("°  rssi=")); Serial.println(lastRssi);
+        currentPhase = TURNING;
+        phaseStartMs = millis();
+    }
+}
+
+void handleTurning()
+{
+    int deltaDeg = bestBeaconAngle - 90;          // +ve = right of center
+    if (MIRROR_BEACON_ANGLE) deltaDeg = -deltaDeg;
+
+    Serial.print(F("[TURN] target delta=")); Serial.print(deltaDeg); Serial.println(F("°"));
+
+    turnByDegrees(deltaDeg);
+
+    // Ask Pilot for a confirmation sweep, then move into VERIFYING.
+    i2cSendByte(CMD_SWEEP);
+    currentPhase = VERIFYING;
+    phaseStartMs = millis();
+}
+
+void handleVerifying()
+{
+    if (millis() - phaseStartMs > LOCALIZE_TIMEOUT_MS)
+    {
+        Serial.println(F("[VERIFY] timeout — engaging DRIVING anyway"));
+        currentPhase = DRIVING;
+        return;
+    }
+
+    if (millis() - lastPollMs < POLL_INTERVAL_MS) return;
+    lastPollMs = millis();
+
+    uint8_t done = 0, ang = 90;
+    int8_t  rssi = -127;
+    if (!readSweepStatus(done, ang, rssi)) return;
+
+    if (done)
+    {
+        int err = abs((int)ang - 90);
+        Serial.print(F("[VERIFY] peak=")); Serial.print(ang);
+        Serial.print(F("° err="));         Serial.println(err);
+
+        if (err <= (int)VERIFY_PEAK_TOL_DEG)
+        {
+            Serial.println(F("[VERIFY] Heading good. Engaging DRIVING."));
+            currentPhase = DRIVING;
+        }
+        else
+        {
+            Serial.println(F("[VERIFY] Off-center — re-turning."));
+            bestBeaconAngle = ang;
+            currentPhase    = TURNING;
+            phaseStartMs    = millis();
+        }
+    }
 }
 
 
@@ -268,6 +527,18 @@ void setup()
 
     memset(readings, 0, sizeof(readings));
 
+    // MPU init + calibrate. Tank MUST be stationary during calibrateMpu().
+    initMpu();
+    Serial.println(F("[MPU] calibrating gyro offset (hold still)..."));
+    calibrateMpu();
+    Serial.print  (F("[MPU] gyroZOffset=")); Serial.println(gyroZOffset);
+
+    // Kick off Pilot's beacon localization sweep.
+    Serial.println(F("[BEACON] requesting sweep..."));
+    i2cSendByte(CMD_SWEEP);
+    phaseStartMs = millis();
+    lastPollMs   = 0;
+
 /*
     Serial.println(F("=== ScoutPDTest ready ==="));
     Serial.print(F("Kp="));     Serial.print(DEFAULT_KP);
@@ -284,6 +555,17 @@ void setup()
 
 void loop()
 {
+    // Phase machine: only DRIVING falls through to the original obstacle-avoidance body.
+    switch (currentPhase)
+    {
+        case LOCALIZING: handleLocalizing(); return;
+        case TURNING:    handleTurning();    return;
+        case VERIFYING:  handleVerifying();  return;
+        case DRIVING:    /* fall through to original loop body below */ break;
+    }
+
+    // ─── Original DRIVING-phase body (unchanged) ─────────────────────────────
+
     // 1. Scan
     scanAll();
 
